@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>@LABEL@</string>
+
+    <!-- A login shell, so the job inherits the same PATH as a real terminal
+         tab (.zprofile: homebrew, etc). See docs/findings.md. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/zsh</string>
+        <string>-lc</string>
+        <string>exec @SCRIPT@</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>CLAUDE_RC_BIN</key><string>@CLAUDE_BIN@</string>
+        <key>CLAUDE_RC_DIR</key><string>@WORKDIR@</string>
+        <key>CLAUDE_RC_LOG_DIR</key><string>@LOG_DIR@</string>
+    </dict>
+
+    <key>WorkingDirectory</key>
+    <string>@WORKDIR@</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Persistent server: bring it back if it ever dies. ThrottleInterval
+         keeps a failing binary from hot-looping. -->
+    <key>KeepAlive</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>60</integer>
+
+    <key>StandardOutPath</key>
+    <string>@LOG_DIR@/claude-rc.launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>@LOG_DIR@/claude-rc.launchd.log</string>
+</dict>
+</plist>
