@@ -26,6 +26,13 @@ bad()  { printf '  %sFAIL%s %s\n' "$C_RED" "$C_RESET" "$*"; }
 info() { printf '  %s%s%s\n' "$C_DIM" "$*" "$C_RESET"; }
 die()  { printf '%serror:%s %s\n' "$C_RED" "$C_RESET" "$*" >&2; exit 1; }
 
+# These scripts drive launchd. On Windows the same job is done by the
+# PowerShell scripts next to them, with Task Scheduler instead of launchd.
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*)
+    die 'on Windows use the PowerShell scripts: .\install.ps1, .\doctor.ps1, .\uninstall.ps1' ;;
+esac
+
 gui_domain() { printf 'gui/%s' "$(id -u)"; }
 plist_path() { printf '%s/Library/LaunchAgents/%s.plist' "$HOME" "$1"; }
 
@@ -86,23 +93,36 @@ except Exception: print("")' "$1" 2>/dev/null
 
 # Claude Code refuses to start in a directory whose trust dialog was never
 # accepted, and under launchd there is nobody to answer it — so the agent would
-# fail silently at every login. Check up front instead. Trust accepted in a
-# parent directory also covers its children (see docs/findings.md).
+# fail silently at every login. Check up front instead.
+#
+#   0 trusted   1 not trusted   2 no ~/.claude.json   3 home directory
+#
+# Trust accepted in a parent directory also covers its children, but the walk
+# stops at the git repository root: a repo inside a trusted folder needs its own
+# trust. Home-directory trust is never saved, so $HOME can never work. See
+# docs/findings.md.
 workspace_trusted() {  # workspace_trusted <dir>
   python3 - "$1" <<'PY'
 import json, os, sys
 d = os.path.realpath(sys.argv[1])
+if d == os.path.realpath(os.path.expanduser("~")):
+    sys.exit(3)
 try:
     cfg = json.load(open(os.path.expanduser("~/.claude.json")))
 except Exception:
     sys.exit(2)
 trusted = {os.path.realpath(os.path.expanduser(k))
            for k, v in (cfg.get("projects") or {}).items() if v.get("hasTrustDialogAccepted")}
+stop = d
+while not os.path.exists(os.path.join(stop, ".git")) and os.path.dirname(stop) != stop:
+    stop = os.path.dirname(stop)
+if not os.path.exists(os.path.join(stop, ".git")):
+    stop = None
 while True:
     if d in trusted:
         sys.exit(0)
     parent = os.path.dirname(d)
-    if parent == d:
+    if d == stop or parent == d:
         sys.exit(1)
     d = parent
 PY
