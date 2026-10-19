@@ -91,7 +91,7 @@ if (-not $workdir) {
 } else {
   switch (Test-WorkspaceTrusted $workdir) {
     0 { Ok "$workdir is trusted by Claude Code" }
-    3 { Fail "$workdir is your home directory, which Claude Code never trusts - reinstall with -Dir <project>" }
+    3 { Fail "$workdir is your home directory, which is not trusted (Claude Code no longer saves trust for it) - reinstall with -Dir <project>" }
     default {
       Fail "$workdir is NOT trusted - the agent will fail silently at logon.
        Run ``claude`` there once and accept the trust dialog."

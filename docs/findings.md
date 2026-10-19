@@ -4,7 +4,9 @@ Each entry says how it was checked, so a future reader can tell evidence from
 assumption. The first part was observed on a Mac (macOS 26.5.2, Claude Code
 2.1.246, later 2.1.303); [the Windows part](#windows) on a Windows 11 PC
 (10.0.26200, Claude Code 2.1.303). Some Windows findings correct macOS ones;
-those entries say so.
+those entries say so. The Windows findings that apply to macOS were re-checked
+on a Mac on 2026-10-19 (macOS 26.6.2, Claude Code 2.1.304); each entry says
+what was found.
 
 ## `claude rc` needs no TTY
 
@@ -73,9 +75,10 @@ containing `/versions/`.
 
 ## Two servers in the same directory coexist
 
-**Superseded** on Claude Code 2.1.303 at least on Windows: a second server is
-refused — see [below](#claude-code-refuses-a-second-server-in-the-same-directory).
-Not re-checked on macOS. The original observation, on 2.1.246:
+**Superseded**: a second server is now refused, on Windows (2.1.303) and on
+macOS (2.1.304) — see
+[below](#claude-code-refuses-a-second-server-in-the-same-directory). The
+original observation, on 2.1.246:
 
 **Verified.** A second `claude rc` started in a directory that already had one
 connected fine and reported `Capacity: 1/32` independently. Duplicates are
@@ -116,9 +119,8 @@ started there with stdin from `/dev/null` and reached `Ready · myproject`
 with nothing on stderr. `workspace_trusted` therefore walks up the parents.
 
 **Refined on Windows:** the walk stops at the git repository root — see
-[below](#parent-trust-stops-at-the-git-repository-root). Not re-checked on
-macOS; it is consistent with the observation above if `myproject` was not a
-git repository.
+[below](#parent-trust-stops-at-the-git-repository-root). Verified on macOS
+too, in the same entry.
 
 ## `--no-create-session-in-dir` keeps idle servers small
 
@@ -170,10 +172,29 @@ won't help. Run `claude rc` from a project directory instead
 ```
 
 `~/.claude.json` did list the home directory, with
-`hasTrustDialogAccepted: false`. The old default of serving `$HOME` can
-therefore never work, and both installers now refuse it with that explanation.
-The message is generic Claude Code wording, so it very likely applies on macOS
-too, but that was not checked there.
+`hasTrustDialogAccepted: false`. An untrusted home can therefore never become
+trusted.
+
+**Different on macOS, verified on 2026-10-19 (Claude Code 2.1.304).** On the
+Mac, `~/.claude.json` lists the home directory with
+`hasTrustDialogAccepted: true`, saved at some earlier time (when, and by which
+version, is not known). `claude rc --no-create-session-in-dir` started in
+`$HOME` with stdin from `/dev/null` reached `Ready · <user> · HEAD` with
+nothing on stderr, and was still `Ready` after 30 s. A new directory directly
+under `$HOME`, with no entry of its own and no trusted parent other than
+`$HOME`, also reached `Ready`. So Claude Code still honours a home trust that
+was saved earlier, and that trust covers the non-repo children of home.
+
+The difference is the saved state, not the platform. `workspace_trusted`
+(lib.sh) and `Test-WorkspaceTrusted` (lib.ps1) therefore return 3 only when the
+home directory is *not* trusted in `~/.claude.json`, and both installers
+refuse only that case. A home with saved trust passes like any other trusted
+directory. Whether a current Claude Code on macOS also refuses to save a new
+home trust was not checked: it needs an untrusted home and an interactive
+trust dialog. The lib.sh version was checked on the Mac against both real
+cases above and against a temporary `HOME` with no `~/.claude.json`, an
+untrusted home and a trusted home (3, 3 and 0). The lib.ps1 change mirrors it
+and was not run on Windows.
 
 ## Parent trust stops at the git repository root
 
@@ -192,6 +213,20 @@ repo, but does not reach into a repo. `workspace_trusted` (lib.sh) and
 `Test-WorkspaceTrusted` (lib.ps1) therefore walk up the parents and stop at the
 innermost directory containing `.git`. Both were checked against this table.
 
+**Verified on macOS** on 2026-10-19 (Claude Code 2.1.304), with
+`claude rc --no-create-session-in-dir`, stdin from `/dev/null`, stdout and
+stderr to files, read after about 12 s. `~/git/test123` has trust of its own
+and is not a git repository; the two subdirectories were made for the test:
+
+| directory | git repo? | `workspace_trusted` | `claude rc` |
+|-----------|-----------|---------------------|-------------|
+| `~/git/test123` | no, trusted | 0 | `Ready` |
+| `~/git/test123/sub` | no, no entry | 0 | `Ready` |
+| `~/git/test123/subrepo` | yes (`git init`), no entry | 1 | `Workspace not trusted` |
+
+The untrusted run exited at once with the same message as in
+[the macOS trust entry](#workspace-trust-blocks-startup-and-launchd-cannot-answer-the-dialog).
+
 ## Claude Code refuses a second server in the same directory
 
 **Verified.** With a server `Ready` in a directory, a second `claude rc` there
@@ -207,6 +242,12 @@ and exited with code 1 after the announced 45–75 s. Servers in other
 directories are unaffected. The wrapper's own guard is still useful: it idles
 instead of logging this error every couple of minutes.
 
+**Verified on macOS** on 2026-10-19 (Claude Code 2.1.304). With a server
+`Ready` in `~/git/test123`, two more `claude rc --no-create-session-in-dir`
+started there each printed the same error on stderr and nothing else. One
+exited with code 1 after 57 s, the other after about 77 s. The first server
+stayed `Ready`.
+
 ## A stopped server can hold its directory for about three minutes
 
 **Measured.** After `Stop-Process -Force` on a `Ready` server, every new server
@@ -214,6 +255,11 @@ in that directory got the "already served" error for between 2 min 45 s and
 3 min 10 s (polled every 30 s). A second run, under the agent, gave
 2.5–3.75 min. No local file changed in `~/.claude`, `%TEMP%`, `%LOCALAPPDATA%`
 or `%APPDATA%`, so the hold is most likely server-side.
+
+On macOS a clean stop does the same: after `kill -INT` on a `Ready` server
+started with `--no-create-session-in-dir` (gone within 1 s), a new server in
+that directory reached `Ready` within 14 s with nothing on stderr (one test,
+2026-10-19, Claude Code 2.1.304). A forced stop was not tested on macOS.
 
 A clean stop (Ctrl+C, see below) released the directory immediately in the two
 cases tested with `--no-create-session-in-dir`: the replacement reached `Ready`
@@ -295,6 +341,14 @@ Developer Mode), the `CLAUDE.md -> AGENTS.md` symlink was checked out as a text
 file containing just `AGENTS.md`. `CLAUDE.md` is now a regular file that
 imports `@AGENTS.md`, which works on both platforms. On Windows the skill link
 is a junction, which needs no privileges.
+
+**Correction, verified on macOS on 2026-10-19.** Editing that text file on
+Windows did not make it a regular file: git kept mode `120000`, so the commit
+changed the link target to `@AGENTS.md`. On the Mac this checked out as a
+broken symlink `CLAUDE.md -> @AGENTS.md`. The file was then re-added from the
+Mac as a regular file (mode `100644`, `git ls-files -s CLAUDE.md`). To change
+the type of a file on Windows, remove it from the index first
+(`git rm --cached`).
 
 ## `powershell -File` does not pass `--` through
 

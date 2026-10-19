@@ -95,24 +95,26 @@ except Exception: print("")' "$1" 2>/dev/null
 # accepted, and under launchd there is nobody to answer it — so the agent would
 # fail silently at every login. Check up front instead.
 #
-#   0 trusted   1 not trusted   2 no ~/.claude.json   3 home directory
+#   0 trusted   1 not trusted   2 no ~/.claude.json   3 untrusted home directory
 #
 # Trust accepted in a parent directory also covers its children, but the walk
 # stops at the git repository root: a repo inside a trusted folder needs its own
-# trust. Home-directory trust is never saved, so $HOME can never work. See
+# trust. Claude Code no longer saves trust for $HOME, so an untrusted home can
+# never become trusted; a home trusted earlier still works. See
 # docs/findings.md.
 workspace_trusted() {  # workspace_trusted <dir>
   python3 - "$1" <<'PY'
 import json, os, sys
 d = os.path.realpath(sys.argv[1])
-if d == os.path.realpath(os.path.expanduser("~")):
-    sys.exit(3)
+home = d == os.path.realpath(os.path.expanduser("~"))
 try:
     cfg = json.load(open(os.path.expanduser("~/.claude.json")))
 except Exception:
-    sys.exit(2)
+    sys.exit(3 if home else 2)
 trusted = {os.path.realpath(os.path.expanduser(k))
            for k, v in (cfg.get("projects") or {}).items() if v.get("hasTrustDialogAccepted")}
+if home:
+    sys.exit(0 if d in trusted else 3)
 stop = d
 while not os.path.exists(os.path.join(stop, ".git")) and os.path.dirname(stop) != stop:
     stop = os.path.dirname(stop)

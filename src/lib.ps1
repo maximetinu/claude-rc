@@ -87,21 +87,28 @@ function Get-GitRoot([string]$dir) {
 # accepted, and a scheduled task cannot answer it - so the agent would fail
 # silently at every logon. Check up front instead.
 #
-#   0 trusted   1 not trusted   2 no ~/.claude.json   3 home directory
+#   0 trusted   1 not trusted   2 no ~/.claude.json   3 untrusted home directory
 #
 # Trust in a parent covers a child, but the walk stops at the git repository
-# root: a repo inside a trusted folder needs its own trust. Home-directory
-# trust is never saved, so $HOME can never work. See docs/findings.md.
+# root: a repo inside a trusted folder needs its own trust. Claude Code no
+# longer saves trust for $HOME, so an untrusted home can never become trusted;
+# a home trusted earlier still works. See docs/findings.md.
 function Test-WorkspaceTrusted([string]$dir) {
   $d = Normalize-Dir $dir
-  if (Same-Dir $d $HOME) { return 3 }
+  $isHome = Same-Dir $d $HOME
   $cfgFile = Join-Path $HOME '.claude.json'
-  try { $cfg = Get-Content -Raw -Encoding UTF8 $cfgFile | ConvertFrom-Json } catch { return 2 }
+  try { $cfg = Get-Content -Raw -Encoding UTF8 $cfgFile | ConvertFrom-Json } catch {
+    if ($isHome) { return 3 } else { return 2 }
+  }
   $trusted = @()
   if ($cfg.projects) {
     foreach ($prop in $cfg.projects.PSObject.Properties) {
       if ($prop.Value.hasTrustDialogAccepted) { $trusted += Normalize-Dir $prop.Name }
     }
+  }
+  if ($isHome) {
+    foreach ($t in $trusted) { if (Same-Dir $t $d) { return 0 } }
+    return 3
   }
   $stop = Get-GitRoot $d
   while ($d) {

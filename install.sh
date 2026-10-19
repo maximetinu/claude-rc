@@ -96,8 +96,8 @@ if workspace_trusted "$WORKDIR"; then
 else
   case $? in
     2) warn "no ~/.claude.json yet — run \`claude\` once before relying on this" ;;
-    3) die "$WORKDIR is your home directory, and Claude Code never saves trust
-       for it, so \`claude rc\` can never start there. Pick a project directory
+    3) die "$WORKDIR is your home directory. It is not trusted, and Claude Code
+       no longer saves trust for it, so \`claude rc\` can never start there. Pick a project directory
        with --dir." ;;
     *) die "$WORKDIR has not been trusted by Claude Code.
        Under launchd nobody can answer the trust dialog, so the agent would fail

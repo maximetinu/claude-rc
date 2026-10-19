@@ -28,7 +28,7 @@ without remembering to launch anything.
 
 Options:
   -Dir <path>     Directory the server runs in   (required in practice: Claude
-                  Code never trusts the home directory)
+                  Code no longer trusts a new home dir)
   -Label <id>     task name                      (default: $DefaultLabel)
   -NoSkill        Do not link the /claude-rc skill into ~\.claude\skills
   -Help           Show this help
@@ -88,8 +88,8 @@ switch (Test-WorkspaceTrusted $WorkDir) {
   0 { Ok 'workspace is trusted' }
   2 { Warn 'no ~\.claude.json yet - run `claude` once before relying on this' }
   3 {
-    Die "$WorkDir is your home directory, and Claude Code never saves trust for it,
-       so ``claude rc`` can never start there. Pick a project directory with -Dir."
+    Die "$WorkDir is your home directory. It is not trusted, and Claude Code no longer
+       saves trust for it, so ``claude rc`` can never start there. Pick a project directory with -Dir."
   }
   default {
     Die "$WorkDir has not been trusted by Claude Code.

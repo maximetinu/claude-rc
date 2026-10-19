@@ -30,8 +30,8 @@ cd $HOME\git\claude-rc
 
 That is it. `claude rc` now runs in that directory from every login onwards.
 Pick a directory you have trusted in Claude Code (see
-[Requirements](#requirements)); your home directory cannot be used, because
-Claude Code never saves trust for it.
+[Requirements](#requirements)); your home directory usually cannot be used,
+because Claude Code no longer saves trust for it.
 
 ## Commands
 

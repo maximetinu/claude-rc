@@ -18,7 +18,7 @@ they encode failure modes that are easy to miss (see `docs/findings.md`).
 
 | Ask | Do |
 |-----|-----|
-| "set it up" / "make it start on its own" | `./install.sh --dir <trusted project dir>` (never `$HOME`: Claude Code never trusts it) |
+| "set it up" / "make it start on its own" | `./install.sh --dir <trusted project dir>` (not `$HOME`: Claude Code no longer saves trust for it) |
 | "is it working?" / "why can't my phone see it?" | `./doctor.sh`, then read the table below |
 | "turn it off" / "stop it starting at login" | `./uninstall.sh` |
 | "restart it now" | `launchctl kickstart -k gui/$(id -u)/com.claude-rc.autostart` |
