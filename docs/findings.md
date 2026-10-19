@@ -139,11 +139,17 @@ URL.
 seconds later all were `running`. `install.sh` now waits while the state is
 `xpcproxy`.
 
+## Every agent starts after a reboot
+
+**Verified** on 2026-10-20 (macOS 26.6.2, Claude Code 2.1.304). The Mac was
+shut down with `shutdown -h` and powered on again; it boots to the login
+window (no automatic login). After the password was typed, all 15 agents
+logged a `launchd start` within 3 s of each other, each log ended in an
+`exec:` line with nothing after it, and `./doctor.sh --all` exited 0 about
+three minutes after boot.
+
 ## Not verified
 
-- Behaviour across an actual reboot — it could not be tested without rebooting.
-  Everything a reboot depends on (RunAtLoad, agent enabled, trust on disk,
-  stable binary path) was checked individually.
 - Whether the server recovers on its own from sleep/wake or a long network
   outage. `KeepAlive` covers the process *dying*; it would not help a process
   that stays alive but stops being reachable. No evidence either way was
