@@ -193,8 +193,21 @@ directory. Whether a current Claude Code on macOS also refuses to save a new
 home trust was not checked: it needs an untrusted home and an interactive
 trust dialog. The lib.sh version was checked on the Mac against both real
 cases above and against a temporary `HOME` with no `~/.claude.json`, an
-untrusted home and a trusted home (3, 3 and 0). The lib.ps1 change mirrors it
-and was not run on Windows.
+untrusted home and a trusted home (3, 3 and 0).
+
+**The lib.ps1 version was verified on Windows** on 2026-10-20 (Claude Code
+2.1.304). Against the real `~/.claude.json`, where the home is listed with
+`hasTrustDialogAccepted: false`, `$HOME` gave 3. The trusted-home branch cannot
+be reached on this PC, so a copy of `Test-WorkspaceTrusted`, with `$HOME`
+replaced by a temporary folder, was run under `$ErrorActionPreference =
+'Continue'` (as `doctor.ps1` runs). With no `.claude.json` the home gave 3 and
+another directory 2. With the home untrusted it gave 3; trusted, it gave 0,
+also when the path differed in case and had a trailing backslash. With a
+corrupt `.claude.json` the home gave 3 and another directory 2. That run found
+a bug, now fixed: a missing `.claude.json` made `Get-Content` raise a
+non-terminating error, which `try`/`catch` does not catch, so a non-home
+directory got 1 instead of 2 (see
+[below](#try--catch-misses-non-terminating-errors)).
 
 ## Parent trust stops at the git repository root
 
@@ -212,6 +225,16 @@ Trust in a parent covers non-repo children and subdirectories of a trusted
 repo, but does not reach into a repo. `workspace_trusted` (lib.sh) and
 `Test-WorkspaceTrusted` (lib.ps1) therefore walk up the parents and stop at the
 innermost directory containing `.git`. Both were checked against this table.
+
+**Re-checked on Windows** on 2026-10-20 (Claude Code 2.1.304) after the
+home-trust change in lib.ps1. `claude rc --no-create-session-in-dir` was run in
+its own headless console with stdin, stdout and stderr redirected, and read
+after 12 s. `Test-WorkspaceTrusted` and the real server agreed in every case:
+`claudeworkspace` (trusted, no repo) 0 and `Ready`; `git\owilds-2019-backup` 0
+and `Ready`; `git\owilds-2019` 1 and `Workspace not trusted`. Each `Ready`
+server was stopped with Ctrl+C sent to its console the way `Stop-Agent` does.
+Its whole process tree was gone within 1 s, and no `claude.exe` was left beyond
+those running before the test.
 
 **Verified on macOS** on 2026-10-19 (Claude Code 2.1.304), with
 `claude rc --no-create-session-in-dir`, stdin from `/dev/null`, stdout and
@@ -362,6 +385,17 @@ in `~/.claude/claude-rc/<label>.json`.
 **Known behaviour, not specifically tested here.** `Get-Content` and script
 loading assume the ANSI code page for files without a BOM. The `.ps1` and `.cs`
 files are kept ASCII-only, and JSON is read with `-Encoding UTF8`.
+
+## `try` / `catch` misses non-terminating errors
+
+**Verified** on 2026-10-20. `Get-Content` on a missing file raises a
+*non-terminating* error. Unless the caller has set
+`$ErrorActionPreference = 'Stop'`, a surrounding `try`/`catch` does not catch
+it: the error is printed and the next statement runs with an empty result. In
+`Test-WorkspaceTrusted` that turned "no `~/.claude.json`" (2) into "not
+trusted" (1) under `doctor.ps1`, but not under `install.ps1`, which sets
+`Stop`. Reads in `lib.ps1` that rely on `catch` now pass `-ErrorAction Stop`,
+to `ConvertFrom-Json` as well.
 
 ## Not verified on Windows
 

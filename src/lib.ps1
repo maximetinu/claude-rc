@@ -35,7 +35,7 @@ function Same-Dir([string]$a, [string]$b) {
 function Config-Path([string]$label) { Join-Path $ConfigDir "$label.json" }
 function Get-AgentConfig([string]$label) {
   $p = Config-Path $label
-  if (Test-Path $p) { try { return Get-Content -Raw -Encoding UTF8 $p | ConvertFrom-Json } catch { } }
+  if (Test-Path $p) { try { return Get-Content -Raw -Encoding UTF8 -ErrorAction Stop $p | ConvertFrom-Json -ErrorAction Stop } catch { } }
   return $null
 }
 function Get-AgentDir([string]$label) {
@@ -97,7 +97,7 @@ function Test-WorkspaceTrusted([string]$dir) {
   $d = Normalize-Dir $dir
   $isHome = Same-Dir $d $HOME
   $cfgFile = Join-Path $HOME '.claude.json'
-  try { $cfg = Get-Content -Raw -Encoding UTF8 $cfgFile | ConvertFrom-Json } catch {
+  try { $cfg = Get-Content -Raw -Encoding UTF8 -ErrorAction Stop $cfgFile | ConvertFrom-Json -ErrorAction Stop } catch {
     if ($isHome) { return 3 } else { return 2 }
   }
   $trusted = @()
