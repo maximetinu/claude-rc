@@ -76,6 +76,10 @@ workdir="$(plist_workdir "$PLIST")"
 workdir="${workdir:-$HOME}"
 if workspace_trusted "$workdir"; then
   ok "$workdir is trusted by Claude Code"
+elif [ $? -eq 3 ]; then
+  fail "$workdir is your home directory, which is not trusted, and Claude Code
+       no longer saves trust for it —
+       reinstall with --dir <project>"
 else
   fail "$workdir is NOT trusted — the agent will fail silently at login.
        Run \`claude\` there once and accept the trust dialog."
