@@ -8,8 +8,33 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=src/lib.sh
 source "$SCRIPT_DIR/src/lib.sh"
 
+usage() {
+  cat <<USAGE
+Usage: ./doctor.sh [label]    check one agent   (default: $DEFAULT_LABEL)
+       ./doctor.sh --all      one line per installed agent; exit 1 if any fails
+USAGE
+}
+
+case "${1:-}" in
+  -h|--help) usage; exit 0 ;;
+  --all)
+    labels="$(installed_labels)"
+    [ -n "$labels" ] || { bad "no agents installed — run ./install.sh"; exit 1; }
+    failed=0
+    for l in $labels; do
+      if "$0" "$l" >/dev/null 2>&1; then
+        ok "$l  ($(plist_workdir "$(plist_path "$l")"))"
+      else
+        bad "$l  ($(plist_workdir "$(plist_path "$l")")) — run ./doctor.sh $l"
+        failed=$((failed + 1))
+      fi
+    done
+    exit $(( failed > 0 ? 1 : 0 )) ;;
+esac
+
 LABEL="${1:-$DEFAULT_LABEL}"
 PLIST="$(plist_path "$LABEL")"
+LOG_FILE="$LOG_DIR/$(log_name "$LABEL").log"
 PROBLEMS=0
 fail() { bad "$*"; PROBLEMS=$((PROBLEMS + 1)); }
 
@@ -47,11 +72,7 @@ bin="$(find_claude_bin || true)"
 [ -n "$bin" ] && ok "claude binary: $bin" || fail "cannot find the claude binary"
 
 step "Workspace trust"
-workdir="$(python3 -c '
-import plistlib,sys
-try:
-    with open(sys.argv[1],"rb") as f: print(plistlib.load(f).get("WorkingDirectory",""))
-except Exception: print("")' "$PLIST" 2>/dev/null)"
+workdir="$(plist_workdir "$PLIST")"
 workdir="${workdir:-$HOME}"
 if workspace_trusted "$workdir"; then
   ok "$workdir is trusted by Claude Code"
@@ -61,12 +82,12 @@ else
 fi
 
 step "Server"
-pids="$(rc_servers)"
+pids="$(rc_servers_in "$workdir")"
 count=$(printf '%s' "$pids" | grep -c . || true)
 case "$count" in
-  0) warn "no 'claude rc' server running right now" ;;
-  1) ok "one server running (pid $pids)" ;;
-  *) warn "$count servers running (pids: $(echo "$pids" | tr '\n' ' ')) — harmless but duplicated" ;;
+  0) warn "no 'claude rc' server running in $workdir right now" ;;
+  1) ok "one server running in $workdir (pid $pids)" ;;
+  *) warn "$count servers running in $workdir (pids: $(echo "$pids" | tr '\n' ' ')) — harmless but duplicated" ;;
 esac
 
 step "Network"

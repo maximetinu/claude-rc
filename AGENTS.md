@@ -25,8 +25,13 @@ login, plus an installer, an uninstaller, a health check and a skill.
    are its children — possibly including the session you are running in.
 5. **The wrapper takes configuration from the environment**
    (`CLAUDE_RC_BIN`, `CLAUDE_RC_DIR`, `CLAUDE_RC_LOG_DIR`,
-   `CLAUDE_RC_ALLOW_DUPLICATE`). Keep it free of templating so the installed
-   copy stays byte-identical to `src/`.
+   `CLAUDE_RC_LOG_NAME`, `CLAUDE_RC_ARGS`, `CLAUDE_RC_ALLOW_DUPLICATE`). Keep it
+   free of templating so the installed copy stays byte-identical to `src/`.
+   One installed wrapper serves every `com.claude-rc.*` agent.
+6. **One agent per directory.** Labels must start with `com.claude-rc.`;
+   `doctor.sh --all` and `uninstall.sh` find agents by that prefix. Anything
+   that looks for "the running server" must filter by working directory
+   (`rc_servers_in`), never count every `claude rc` on the machine.
 
 ## Testing
 

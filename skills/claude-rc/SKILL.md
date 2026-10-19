@@ -21,6 +21,9 @@ they encode failure modes that are easy to miss (see `docs/findings.md`).
 | "turn it off" / "stop it starting at login" | `./uninstall.sh` |
 | "restart it now" | `launchctl kickstart -k gui/$(id -u)/com.claude-rc.autostart` |
 | "run it somewhere else" | `./install.sh --dir <path>` (that dir must be trusted first) |
+| "also start sessions in repo X" | `./install.sh --no-skill --dir <repo> --label com.claude-rc.<name> -- --no-create-session-in-dir` (one agent per directory) |
+| "is everything working?" with several agents | `./doctor.sh --all`, then `./doctor.sh <label>` for any FAIL |
+| "stop serving repo X" | `./uninstall.sh --label com.claude-rc.<name>` |
 
 Always run the scripts from the repo root:
 
@@ -41,17 +44,19 @@ after editing anything in `src/`.
 | `... is NOT trusted` | Claude Code refuses to start in an untrusted directory and launchd cannot answer the trust dialog, so the agent dies at every login. Tell the user to run `claude` once in that directory and accept the dialog, then re-run `./install.sh`. |
 | `agent is DISABLED in launchd` | Someone ran `launchctl disable`. Fix: `launchctl enable gui/$(id -u)/com.claude-rc.autostart`, then `./install.sh`. |
 | `cannot find the claude binary` | Claude Code moved or was uninstalled. Reinstall it, then `./install.sh`. |
-| `agent state:` anything but `running` | Read `~/.claude/logs/claude-rc.log` — the wrapper writes `FATAL:` lines for a bad path, and `claude rc`'s own stderr lands there too. |
+| `agent state:` anything but `running` | Read the agent's log: `~/.claude/logs/claude-rc.log` for the default agent, `claude-rc.<suffix>.log` for `com.claude-rc.<suffix>`. The wrapper writes `FATAL:` lines for a bad path, and `claude rc`'s own stderr lands there too. `xpcproxy` right after install is launchd still spawning the job; check again a few seconds later. |
 
 A `WARN` about **no server running** while the agent state is `running` is
 usually not a bug: the wrapper is either waiting for the network, or idling
-because another `claude rc` is already up. The log says which.
+because another `claude rc` is already up in the same directory. The log says
+which.
 
 ## Things that look broken but are not
 
-- **Two servers running.** Harmless — they coexist and each registers its own
-  session. Happens when the user also launched one by hand. The next login
-  resolves it.
+- **Two servers running in the same directory.** Harmless — they coexist and
+  each registers its own session. Happens when the user also launched one by
+  hand. The next login resolves it. Servers in *different* directories are
+  normal: each `com.claude-rc.*` agent serves its own directory.
 - **The agent is `running` but no `claude rc` process exists.** The wrapper is
   the running process; it idles while a manual server is alive and takes over
   within 30s of that one exiting.

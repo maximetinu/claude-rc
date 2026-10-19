@@ -19,6 +19,8 @@
         <key>CLAUDE_RC_BIN</key><string>@CLAUDE_BIN@</string>
         <key>CLAUDE_RC_DIR</key><string>@WORKDIR@</string>
         <key>CLAUDE_RC_LOG_DIR</key><string>@LOG_DIR@</string>
+        <key>CLAUDE_RC_LOG_NAME</key><string>@LOG_NAME@</string>
+        <key>CLAUDE_RC_ARGS</key><string>@RC_ARGS@</string>
     </dict>
 
     <key>WorkingDirectory</key>
@@ -35,8 +37,8 @@
     <integer>60</integer>
 
     <key>StandardOutPath</key>
-    <string>@LOG_DIR@/claude-rc.launchd.log</string>
+    <string>@LOG_DIR@/@LOG_NAME@.launchd.log</string>
     <key>StandardErrorPath</key>
-    <string>@LOG_DIR@/claude-rc.launchd.log</string>
+    <string>@LOG_DIR@/@LOG_NAME@.launchd.log</string>
 </dict>
 </plist>

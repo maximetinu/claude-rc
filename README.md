@@ -25,8 +25,27 @@ That is it. `claude rc` now runs in `$HOME` from every login onwards.
 ./install.sh              # install (idempotent — also the way to apply changes)
 ./install.sh --dir ~/code # run the server somewhere other than $HOME
 ./doctor.sh               # health check; exit 0 = healthy
-./uninstall.sh            # remove autostart, leave the running server alone
+./doctor.sh --all         # one line per installed agent
+./uninstall.sh            # remove autostart; stops the server the agent started
 ```
+
+## One server per directory
+
+The Claude app lists one entry per running server, and a session opened from
+it starts in that server's directory. To start sessions directly in several
+repositories, install one agent per directory, each with its own label:
+
+```sh
+./install.sh --dir ~/git/app --label com.claude-rc.app -- --no-create-session-in-dir
+./doctor.sh com.claude-rc.app
+./uninstall.sh --label com.claude-rc.app
+```
+
+Everything after `--` goes to `claude rc`. `--no-create-session-in-dir` keeps an
+idle server at about 90 MB instead of about 240 MB, because it does not start a
+session (and its MCP servers) until you open one. Each agent has its own log,
+`~/.claude/logs/claude-rc.<suffix>.log`; the default agent keeps
+`claude-rc.log`.
 
 From Claude Code itself, the bundled skill covers the same ground
 conversationally — "is remote control running?", "why can't my phone see this
@@ -41,8 +60,9 @@ Mac?", "turn autostart off":
 - Starts at login, invisibly. No terminal window, no dock icon.
 - Restarts itself if the server ever dies (`KeepAlive`).
 - Waits for the network before starting, which at login is usually not up yet.
-- **Never doubles up.** If you still launch `claude rc` by hand out of habit, the
-  agent notices, idles, and takes over when yours exits.
+- **Never doubles up.** If you still launch `claude rc` by hand out of habit in
+  the same directory, the agent notices, idles, and takes over when yours exits.
+  Servers in other directories do not count.
 - Small, self-trimming log at `~/.claude/logs/claude-rc.log` with the errors and
   none of the status-screen noise.
 - Refuses to install against a version-pinned binary path that would break on
@@ -60,8 +80,9 @@ literally on power-on, enable automatic login in
 
 - macOS (this is launchd-specific)
 - Claude Code installed, with `~/.local/bin/claude` on disk
-- The target directory trusted once by Claude Code — run `claude` there and
-  accept the trust dialog. `install.sh` checks this and refuses otherwise,
+- The target directory, or one of its parents, trusted once by Claude Code —
+  run `claude` there and accept the trust dialog. `install.sh` checks this and
+  refuses otherwise,
   because launchd cannot answer that dialog and the agent would fail silently at
   every login.
 

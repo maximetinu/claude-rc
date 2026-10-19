@@ -79,8 +79,15 @@ untidy, not dangerous — which is why the guard *waits* rather than erroring.
 
 **Verified** by walking the process tree: a Claude Code session started through
 Remote Control appears as a descendant of the `claude rc` process. Killing the
-server kills the sessions under it, so `uninstall.sh` leaves it running by
-default.
+server kills the sessions under it, so `uninstall.sh` does not kill servers it
+did not start unless asked (`--kill-server`).
+
+**Correction, verified on 2026-10-19:** `launchctl bootout` terminates the job,
+so unloading an agent *does* stop the server that agent started, and its
+sessions. `uninstall.sh --label com.claude-rc.claude-rc` removed pid 56182
+within seconds with nothing else sending a signal. The old "left running"
+message was a race: it checked before the process had exited. The same applies
+to `install.sh`, which boots out the agent before loading the new plist.
 
 ## Keychain access works under launchd without a prompt
 
@@ -94,6 +101,30 @@ login, so the keychain is already unlocked.
 without the user's keychain, so `claude` could not authenticate. A LaunchAgent
 starts at *login* instead. For "starts when I power on the Mac", combine it with
 automatic login in System Settings.
+
+## Trust in a parent directory covers its children
+
+**Verified** on 2026-10-19 (Claude Code 2.1.303). `~/git/myproject` had no
+entry of its own in `~/.claude.json`, but `~/git` was trusted. `claude rc`
+started there with stdin from `/dev/null` and reached `Ready · myproject`
+with nothing on stderr. `workspace_trusted` therefore walks up the parents.
+
+## `--no-create-session-in-dir` keeps idle servers small
+
+**Measured** on 2026-10-19. The default server in `~/git` pre-creates one
+session; its process tree (server, session, the session's MCP servers) used
+about 240 MB RSS. Fourteen servers started with `--no-create-session-in-dir`
+used 1.3 GB RSS in total, about 90 MB each, with no child processes until a
+session is opened. A server started this way still registers its environment:
+its status screen showed `Ready · <dir>` and a `claude.ai/code?environment=...`
+URL.
+
+## launchd reports `xpcproxy` for a few seconds after bootstrap
+
+**Verified.** Installing 12 agents in a row, three were still in state
+`xpcproxy` when `install.sh` checked right after `launchctl bootstrap`; a few
+seconds later all were `running`. `install.sh` now waits while the state is
+`xpcproxy`.
 
 ## Not verified
 

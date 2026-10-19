@@ -3,6 +3,9 @@
 # shellcheck shell=bash
 
 DEFAULT_LABEL="com.claude-rc.autostart"
+# Every agent this project installs has a label under this prefix, so one
+# agent per directory can coexist (see installed_labels).
+LABEL_PREFIX="com.claude-rc."
 SCRIPT_DEST="$HOME/.claude/scripts/claude-rc-boot.sh"
 LOG_DIR="$HOME/.claude/logs"
 LOG_FILE="$LOG_DIR/claude-rc.log"
@@ -53,9 +56,38 @@ find_claude_bin() {
   printf '%s' "$p"
 }
 
+# Log file stem for a label. The default agent keeps the historical
+# claude-rc.log; every other agent gets claude-rc.<suffix>.log.
+log_name() {  # log_name <label>
+  case "$1" in
+    "$DEFAULT_LABEL") printf 'claude-rc' ;;
+    "$LABEL_PREFIX"*) printf 'claude-rc.%s' "${1#"$LABEL_PREFIX"}" ;;
+    *)                printf 'claude-rc.%s' "$1" ;;
+  esac
+}
+
+# Labels of every agent this project has installed, one per line.
+installed_labels() {
+  local p
+  for p in "$HOME/Library/LaunchAgents/$LABEL_PREFIX"*.plist; do
+    [ -f "$p" ] && basename "$p" .plist
+  done
+  return 0
+}
+
+# WorkingDirectory of an installed plist, or empty.
+plist_workdir() {  # plist_workdir <plist>
+  python3 -c '
+import plistlib, sys
+try:
+    with open(sys.argv[1], "rb") as f: print(plistlib.load(f).get("WorkingDirectory", ""))
+except Exception: print("")' "$1" 2>/dev/null
+}
+
 # Claude Code refuses to start in a directory whose trust dialog was never
 # accepted, and under launchd there is nobody to answer it — so the agent would
-# fail silently at every login. Check up front instead.
+# fail silently at every login. Check up front instead. Trust accepted in a
+# parent directory also covers its children (see docs/findings.md).
 workspace_trusted() {  # workspace_trusted <dir>
   python3 - "$1" <<'PY'
 import json, os, sys
@@ -64,10 +96,15 @@ try:
     cfg = json.load(open(os.path.expanduser("~/.claude.json")))
 except Exception:
     sys.exit(2)
-for key, val in (cfg.get("projects") or {}).items():
-    if os.path.realpath(os.path.expanduser(key)) == d:
-        sys.exit(0 if val.get("hasTrustDialogAccepted") else 1)
-sys.exit(1)
+trusted = {os.path.realpath(os.path.expanduser(k))
+           for k, v in (cfg.get("projects") or {}).items() if v.get("hasTrustDialogAccepted")}
+while True:
+    if d in trusted:
+        sys.exit(0)
+    parent = os.path.dirname(d)
+    if parent == d:
+        sys.exit(1)
+    d = parent
 PY
 }
 
@@ -76,4 +113,14 @@ PY
 rc_servers() {
   ps -Ao pid=,command= | awk \
     '$2 ~ /(^|\/)claude$/ && ($3 == "rc" || $3 == "remote-control") { print $1 }'
+}
+
+# PIDs of the Remote Control servers whose working directory is <dir>.
+rc_servers_in() {  # rc_servers_in <dir>
+  local pid cwd
+  for pid in $(rc_servers); do
+    cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p')"
+    [ "$cwd" = "$1" ] && printf '%s\n' "$pid"
+  done
+  return 0
 }
