@@ -9,6 +9,7 @@ different mechanisms.
 login
   └─ launchd loads ~/Library/LaunchAgents/com.claude-rc.autostart.plist
        └─ /bin/zsh -lc  exec ~/.claude/scripts/claude-rc-boot.sh
+            ├─ staggered start: wait for this agent's slot after login
             ├─ wait for the network (up to 2 min)
             ├─ idle while another `claude rc` is alive
             └─ exec claude rc      (cwd: ~, stdout discarded, stderr to log)
@@ -32,6 +33,14 @@ that to detect drift.
 
 **`RunAtLoad`** starts it at login. **`KeepAlive`** restarts it if it dies, and
 **`ThrottleInterval 60`** stops a broken binary from hot-looping.
+
+**Staggered start** — right after login every agent would otherwise start in
+the same second as every login item, and the desktop (Spotlight first) stays
+slow for minutes. Each agent waits for its own slot: 60 s after login, then
+one every 12 s, in the sorted order of the installed agents. The wrapper finds
+its own label in `XPC_SERVICE_NAME`, which launchd sets. A restart by
+`KeepAlive` later in the session is past every slot, so it starts at once.
+`CLAUDE_RC_STAGGER=0` turns it off. macOS only for now.
 
 **Network wait** — at login the network is often not up yet. Two minutes, then
 it runs anyway and lets `KeepAlive` retry.

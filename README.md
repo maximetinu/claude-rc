@@ -80,6 +80,8 @@ machine?", "turn autostart off":
 - Restarts itself if the server ever dies (`KeepAlive` on macOS, a supervising
   loop in the wrapper on Windows).
 - Waits for the network before starting, which at login is usually not up yet.
+- Staggers the start on macOS: one agent every 12 s from 60 s after login, so
+  many agents do not slow down the desktop (Spotlight first) right after login.
 - **Never doubles up.** If you still launch `claude rc` by hand out of habit in
   the same directory, the agent notices, idles, and takes over when yours exits.
   Servers in other directories do not count.

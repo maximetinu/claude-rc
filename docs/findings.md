@@ -148,6 +148,33 @@ logged a `launchd start` within 3 s of each other, each log ended in an
 `exec:` line with nothing after it, and `./doctor.sh --all` exited 0 about
 three minutes after boot.
 
+## Many agents at login slow the whole desktop
+
+**Verified** on 2026-10-25 (macOS 26, 15 agents, 12 login items). Five minutes
+after login the 1-minute load average was 180 and the disk did 3000-4600
+operations per second; Spotlight (Cmd+Space) was slow to react. Swap was 0 %,
+so the limit was CPU and disk, not memory. All 15 agents had logged
+`launchd start` in the same second (21:39:51), 20 s after login. Twenty-five
+minutes after login the load average was down to 6. The wrapper now staggers
+the start (see how-it-works.md). **Not yet verified:** the effect on a real
+login; check the `staggered start` lines in the logs after the next reboot.
+
+## launchd sets `XPC_SERVICE_NAME` to the job label
+
+**Verified** with `ps eww` on a running server: `XPC_SERVICE_NAME=com.claude-rc.rallo`.
+The wrapper uses it to find its own slot. Do not set this variable by hand to
+test: any process started with an unknown `XPC_SERVICE_NAME` aborts at once
+(exit 134), even `/bin/echo`. Test with another variable name in a scratch copy.
+
+## Login time comes from `loginwindow`
+
+**Verified** on 2026-10-25. With FileVault the password is typed before the
+boot, so login came 33 s after `kern.boottime` (`loginwindow` owned by the user
+started 21:39:31, boot 21:38:58). Boot time alone would skip the slots when the
+user logs in late, so the wrapper uses the `etime` of the user's `loginwindow`
+and falls back to boot time. **Assumed:** a logout and a new login start a new
+`loginwindow`, so the slots apply again.
+
 ## Not verified
 
 - Whether the server recovers on its own from sleep/wake or a long network

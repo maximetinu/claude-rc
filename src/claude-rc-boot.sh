@@ -43,6 +43,44 @@ log "config: bin=$CLAUDE_BIN dir=$WORKDIR"
 [[ -x "$CLAUDE_BIN" ]] || { log "FATAL: $CLAUDE_BIN is not executable"; exit 1 }
 [[ -d "$WORKDIR"   ]] || { log "FATAL: $WORKDIR is not a directory";    exit 1 }
 
+# 0. Stagger the start right after login. With many agents, all of them starting
+#    in the same second (plus every login item) saturates CPU and disk, and the
+#    desktop — Spotlight first — stays sluggish for minutes. Each agent gets its
+#    own slot after login: 60 s, then one every 12 s, in the sorted order of the
+#    installed agents. launchd puts the job label in XPC_SERVICE_NAME. Restarts
+#    by KeepAlive later in the session are not delayed. CLAUDE_RC_STAGGER=0
+#    disables it.
+#
+#    Login time is the start of this user's loginwindow (see docs/findings.md);
+#    if it cannot be found, boot time stands in.
+session_age() {
+  local et d=0 h=0 m=0 s=0
+  et=$(ps -Ao user=,etime=,comm= | awk -v u="$(id -un)" \
+    '$1 == u && $3 ~ /\/loginwindow$/ { print $2; exit }')
+  if [[ -n "$et" ]]; then
+    [[ "$et" == *-* ]] && { d=${et%%-*}; et=${et#*-} }
+    local parts=( ${(s.:.)et} )
+    (( ${#parts} == 3 )) && h=${parts[1]}
+    m=${parts[-2]} s=${parts[-1]}
+    print $(( 10#$d * 86400 + 10#$h * 3600 + 10#$m * 60 + 10#$s ))
+  else
+    print $(( $(date +%s) - $(sysctl -n kern.boottime | sed -E 's/^\{ sec = ([0-9]+).*/\1/') ))
+  fi
+}
+
+if [[ "${CLAUDE_RC_STAGGER:-1}" != "0" ]]; then
+  age=$(session_age)
+  agents=( $HOME/Library/LaunchAgents/com.claude-rc.*.plist(N:t:r) )
+  idx=${agents[(ie)${XPC_SERVICE_NAME:-}]}
+  slot=$(( 60 + 12 * (idx - 1) ))
+  # Label not found (not run by launchd, or not installed): take the last slot.
+  (( slot > 60 + 12 * ${#agents} )) && slot=$(( 60 + 12 * ${#agents} ))
+  if (( age < slot )); then
+    log "staggered start: waiting $(( slot - age ))s (slot ${slot}s after login)"
+    sleep $(( slot - age ))
+  fi
+fi
+
 # 1. At login the network is usually not up yet; give it up to two minutes.
 #    If it never comes up we run anyway and let KeepAlive retry us.
 for i in {1..24}; do

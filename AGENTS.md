@@ -39,7 +39,7 @@ behaviour. A change to one side usually needs its counterpart on the other.
    byte-identical to `src/`. One installed wrapper serves every agent. On macOS
    it takes its configuration from the environment (`CLAUDE_RC_BIN`,
    `CLAUDE_RC_DIR`, `CLAUDE_RC_LOG_DIR`, `CLAUDE_RC_LOG_NAME`, `CLAUDE_RC_ARGS`,
-   `CLAUDE_RC_ALLOW_DUPLICATE`); on Windows from
+   `CLAUDE_RC_ALLOW_DUPLICATE`, `CLAUDE_RC_STAGGER`); on Windows from
    `~/.claude/claude-rc/<label>.json`, because the task can only pass `-Label`.
 6. **One agent per directory.** Labels must start with `com.claude-rc.`; the
    doctor's all-agents mode and the uninstaller find agents by that prefix
